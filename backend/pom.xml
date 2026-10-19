@@ -24,6 +24,7 @@
         <springdoc.version>2.9.1</springdoc.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <jjwt.version>0.12.7</jjwt.version>
+        <minio.version>8.5.17</minio.version>
     </properties>
 
     <dependencies>
@@ -91,6 +92,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- 对象存储：头像（P4） -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>${minio.version}</version>
         </dependency>
 
         <!-- 测试 -->

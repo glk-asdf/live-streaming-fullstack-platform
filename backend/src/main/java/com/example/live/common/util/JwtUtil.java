@@ -19,6 +19,8 @@ import java.util.UUID;
 @Component
 public class JwtUtil {
 
+    public static final long PLAY_TOKEN_EXPIRE_SECONDS = 300;
+
     private final SecretKey key;
     private final long accessExpireSeconds;
 
@@ -40,6 +42,25 @@ public class JwtUtil {
                 .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(accessExpireSeconds)))
+                .signWith(key)
+                .compact();
+    }
+
+    /**
+     * 播放令牌只用于 MediaMTX read 鉴权，5 分钟有效；游客也签发，但只用随机 subject 标识。
+     */
+    public String generatePlayToken(Long roomId, Long userId) {
+        Instant now = Instant.now();
+        String subject = userId == null
+                ? "guest:" + UUID.randomUUID()
+                : "user:" + userId;
+        return Jwts.builder()
+                .subject(subject)
+                .claim("roomId", roomId)
+                .claim("play", true)
+                .id(UUID.randomUUID().toString())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(PLAY_TOKEN_EXPIRE_SECONDS)))
                 .signWith(key)
                 .compact();
     }

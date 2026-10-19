@@ -26,4 +26,15 @@ public final class SecurityUtil {
     public static Long currentUserId() {
         return currentUser().id();
     }
+
+    /**
+     * 公开接口可选登录：游客返回 null，不抛 401。
+     */
+    public static Long currentUserIdOrNull() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof LoginUser loginUser) {
+            return loginUser.id();
+        }
+        return null;
+    }
 }

@@ -8,8 +8,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param rtmpHost   RTMP 主机名（对外可访问）
  * @param rtmpPort   RTMP 端口
  * @param hlsBase    LL-HLS 基础地址
- * @param webrtcBase WHEP 基础地址
- * @param apiBase    MediaMTX 管理 API 地址（仅后端内网访问）
+ * @param webrtcBase   WHEP 基础地址
+ * @param apiBase      MediaMTX 管理 API 地址（仅后端内网访问）
+ * @param callbackToken MediaMTX 回调共享令牌，防止伪造事件
  */
 @ConfigurationProperties(prefix = "live.media")
 public record MediaProperties(
@@ -17,5 +18,6 @@ public record MediaProperties(
         int rtmpPort,
         String hlsBase,
         String webrtcBase,
-        String apiBase) {
+        String apiBase,
+        String callbackToken) {
 }

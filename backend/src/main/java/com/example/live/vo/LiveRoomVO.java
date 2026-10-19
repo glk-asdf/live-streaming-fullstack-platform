@@ -17,5 +17,8 @@ public record LiveRoomVO(
         @Schema(description = "点赞数") Long likeCount,
         @Schema(description = "热度分") Integer hotScore,
         @Schema(description = "开播时间") LocalDateTime liveStartTime,
-        @Schema(description = "创建时间") LocalDateTime createdAt) {
+        @Schema(description = "结束时间") LocalDateTime liveEndTime,
+        @Schema(description = "创建时间") LocalDateTime createdAt,
+        @Schema(description = "主播昵称") String anchorNickname,
+        @Schema(description = "主播头像") String anchorAvatar) {
 }

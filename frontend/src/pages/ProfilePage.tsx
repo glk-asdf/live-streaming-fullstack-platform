@@ -1,13 +1,13 @@
-import { SaveOutlined } from '@ant-design/icons'
+import { SaveOutlined, UploadOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { App, Avatar, Button, Card, Form, Input, Space, Tag, Typography } from 'antd'
-import { useEffect } from 'react'
-import { fetchMe, updateMe } from '@/api/auth'
+import { App, Avatar, Button, Card, Form, Input, Space, Tag, Typography, Upload } from 'antd'
+import { useEffect, useState } from 'react'
+import { fetchMe, updateMe, uploadAvatar } from '@/api/auth'
 import SiteHeader from '@/components/SiteHeader'
 import { useUserStore } from '@/store/useUserStore'
 import type { UpdateProfilePayload } from '@/types/auth'
 
-const { Title, Paragraph, Text } = Typography
+const { Title, Text } = Typography
 const { TextArea } = Input
 
 const roleLabels: Record<string, string> = {
@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const queryClient = useQueryClient()
   const user = useUserStore((state) => state.user)
   const setUser = useUserStore((state) => state.setUser)
+  const [uploading, setUploading] = useState(false)
 
   const me = useQuery({
     // 带上用户 ID，切换账号后不会命中上一个账号的缓存
@@ -41,6 +42,29 @@ export default function ProfilePage() {
       bio: me.data.bio ?? '',
     })
   }, [me.data, form, setUser])
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+      message.error('仅支持 PNG/JPEG/WebP/GIF 图片')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      message.error('头像不能超过 5MB')
+      return
+    }
+    setUploading(true)
+    try {
+      const data = await uploadAvatar(file)
+      setUser(data)
+      queryClient.setQueryData(['me', data.id], data)
+      form.setFieldsValue({ avatar: data.avatar ?? '' })
+      message.success('头像已更新')
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '头像上传失败')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: updateMe,
@@ -82,9 +106,21 @@ export default function ProfilePage() {
             </div>
           </Space>
 
-          <Paragraph className="profile-tip">
-            头像暂用 URL，图片上传（MinIO）在 P4 接入。
-          </Paragraph>
+          <div className="profile-avatar-action">
+            <Upload
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              showUploadList={false}
+              beforeUpload={(file) => {
+                void handleAvatarUpload(file)
+                return false
+              }}
+            >
+              <Button icon={<UploadOutlined />} loading={uploading}>
+                上传头像
+              </Button>
+            </Upload>
+            <Text type="secondary">PNG/JPEG/WebP/GIF，最大 5MB，存储到 MinIO</Text>
+          </div>
 
           <Form<UpdateProfilePayload>
             form={form}

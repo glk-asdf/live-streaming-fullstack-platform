@@ -49,6 +49,8 @@ export default function SiteHeader() {
       </Link>
       <nav className="site-nav">
         <Link to="/">首页</Link>
+        <Link to="/#live">发现直播</Link>
+        <Link to="/anchor">主播中心</Link>
         <Link to="/#roadmap">分档路线</Link>
         <a href="http://localhost:8080/swagger-ui.html" target="_blank" rel="noreferrer">
           接口文档

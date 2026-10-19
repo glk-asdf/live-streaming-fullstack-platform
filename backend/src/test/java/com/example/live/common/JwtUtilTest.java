@@ -35,6 +35,20 @@ class JwtUtilTest {
     }
 
     @Test
+    void playTokenCarriesRoomAndIsShortLived() {
+        JwtUtil jwtUtil = new JwtUtil(new JwtProperties(SECRET, 3600, 7200));
+
+        String token = jwtUtil.generatePlayToken(42L, null);
+        Claims claims = jwtUtil.parse(token);
+
+        assertThat(claims.getSubject()).startsWith("guest:");
+        assertThat(((Number) claims.get("roomId")).longValue()).isEqualTo(42L);
+        assertThat(claims.get("play", Boolean.class)).isTrue();
+        long ttlSeconds = (claims.getExpiration().getTime() - claims.getIssuedAt().getTime()) / 1000;
+        assertThat(ttlSeconds).isEqualTo(JwtUtil.PLAY_TOKEN_EXPIRE_SECONDS);
+    }
+
+    @Test
     void expiredTokenIsRejected() {
         JwtUtil jwtUtil = new JwtUtil(new JwtProperties(SECRET, -60, 7200));
         User user = new User();

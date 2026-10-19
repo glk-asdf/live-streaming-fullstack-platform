@@ -6,7 +6,7 @@
 
 | 档位 | 定位 | 状态 |
 |---|---|---|
-| L1 能推能看能聊 | 打通「推流 → 播放 → 弹幕」主链路 | 🚧 进行中（P0~P2 已完成） |
+| L1 能推能看能聊 | 打通「推流 → 播放 → 弹幕」主链路 | 🚧 进行中（P0~P4 已完成） |
 | L2 能互动能运营 | 礼物、榜单、回放、后台、数据看板 | ⬜ 未开始 |
 | L3 能上线能扩展 | 多码率、双实例、压测、可观测、一键部署 | ⬜ 未开始 |
 
@@ -54,7 +54,7 @@ live-streaming-fullstack-platform/
 | Node.js | 22+ | 本机已装 22.21.0 |
 | MySQL | 8.4.9 | `D:\business\tools\mysql-8.4.9-winx64`（已使用） |
 | Redis | 5.0.14.1 | `D:\business\tools\redis-5.0.14.1`（已使用） |
-| MinIO | 归档版 | `D:\business\tools\minio`（P4 起使用） |
+| MinIO | 归档版 | `D:\business\tools\minio`（已使用） |
 | MediaMTX | 1.21.2 | 启动脚本自动下载到 `media/bin/` |
 
 > 不需要 Docker。生产部署在 L3 才引入容器。
@@ -84,7 +84,16 @@ powershell -ExecutionPolicy Bypass -File D:\business\tools\redis-start.ps1
 
 refreshToken 存在 Redis，Redis 未启动时登录会失败。
 
-### 3. 启动媒体服务器
+### 3. 启动 MinIO
+
+```powershell
+$minio = "D:\business\tools\minio"
+Start-Process "$minio\minio.exe" -ArgumentList 'server', "$minio\data", '--address', ':9000', '--console-address', ':9001' -WorkingDirectory $minio
+```
+
+默认账号 `minioadmin` / `minioadmin`。后端启动时会自动创建 `live-public` 桶并设置头像公开读。
+
+### 4. 启动媒体服务器
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File media\media-start.ps1
@@ -92,7 +101,7 @@ powershell -ExecutionPolicy Bypass -File media\media-start.ps1
 
 首次运行会自动下载 MediaMTX，监听 1935 / 8888 / 8889 / 9997，以及 WebRTC 的 UDP 8189。
 
-### 4. 启动后端
+### 5. 启动后端
 
 ```powershell
 cd backend
@@ -104,7 +113,7 @@ cd backend
 - 房间：<http://localhost:8080/api/v1/rooms?page=1&size=12>
 - 文档：<http://localhost:8080/swagger-ui.html>
 
-### 5. 启动前端
+### 6. 启动前端
 
 ```powershell
 cd frontend
@@ -114,7 +123,7 @@ npm run dev
 
 访问 <http://localhost:5173>，页面上的「后端 API」与「媒体服务器」状态卡应显示在线。
 
-### 6. 构建与测试
+### 7. 构建与测试
 
 ```powershell
 cd backend;  .\mvnw.cmd test; .\mvnw.cmd -DskipTests package
@@ -123,20 +132,32 @@ cd ..\frontend; npm run build
 
 > 打包前先停止正在运行的后端：Windows 会锁定 `target` 下的 jar，导致 repackage 失败。
 
-## 当前接口（P2）
+## 当前接口（P4）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/v1/ping` | 服务探活 |
 | GET | `/api/v1/categories` | 分类列表（按 sort 升序） |
-| GET | `/api/v1/rooms` | 房间分页：`page`、`size`（1~50）、`categoryId`、`keyword` |
+| GET | `/api/v1/rooms` | 房间分页：`page`、`size`（1~50）、`categoryId`、`keyword`、`status`（默认 LIVE） |
+| GET | `/api/v1/rooms/mine` | 我的直播间（需登录；无房间时 data 为空） |
+| GET | `/api/v1/rooms/{id}` | 直播间详情（公开，含主播昵称/头像） |
+| GET | `/api/v1/rooms/{id}/play-info` | 播放地址 + 5 分钟播放令牌（公开，仅 LIVE） |
+| POST | `/api/v1/rooms` | 创建直播间（需登录，单账号只能有一个未结束房间） |
+| PUT | `/api/v1/rooms/{id}` | 编辑直播间（仅房主） |
+| POST | `/api/v1/rooms/{id}/start` | 轮换推流密钥并返回 OBS 参数 |
+| POST | `/api/v1/rooms/{id}/stream-key/reset` | 重置推流密钥（仅房主，直播中禁止） |
+| GET | `/api/v1/rooms/{id}/stream` | 查看推流参数（仅房主） |
+| POST | `/api/v1/rooms/{id}/stop` | 结束直播并踢掉推流 |
 | POST | `/api/v1/auth/register` | 注册并自动登录 |
 | POST | `/api/v1/auth/login` | 登录 |
 | POST | `/api/v1/auth/refresh` | 刷新令牌（refreshToken 轮换） |
 | POST | `/api/v1/auth/logout` | 登出（删除服务端 refreshToken） |
 | GET / PUT | `/api/v1/users/me` | 当前用户资料 / 更新资料 |
+| POST | `/api/v1/users/me/avatar` | 上传头像到 MinIO（multipart，≤5MB） |
+| POST | `/api/v1/media/auth` | MediaMTX 推流/播放鉴权回调 |
+| POST | `/api/v1/media/online` / `offline` | MediaMTX 上下线事件 |
 
-> 公开列表暂未按状态过滤，P3 定义开播状态流转后收紧。
+> 公开列表默认只返回 `LIVE` 房间，可通过 `status` 查看其他状态。媒体回调使用共享 token，仅允许受信任来源。
 
 ## 认证说明
 
@@ -144,7 +165,7 @@ cd ..\frontend; npm run build
 - refreshToken：256 位随机串，默认 7 天，存 Redis；每次刷新都会轮换，旧令牌立即失效。
 - 登出删除 refreshToken；已签发的 accessToken 仍会在有效期内可用（无黑名单）。
 - 前端把登录态存在 localStorage（学习项目方案，生产建议改 HttpOnly Cookie），刷新页面保持登录；accessToken 失效时自动用 refreshToken 换新并重放请求。
-- 测试账号：`tester` / `123456`（角色 ANCHOR，可直接体验个人中心）。
+- 测试账号：`tester` / `123456`（角色 ANCHOR，可直接体验个人中心与主播中心）。
 
 ## 端口表
 
@@ -158,11 +179,11 @@ cd ..\frontend; npm run build
 | 8189 | MediaMTX | WebRTC ICE（UDP） |
 | 9997 | MediaMTX | 管理 API（仅本机） |
 | 9996 | MediaMTX | 录制回放（P8 启用，仅内网） |
-| 3306 | MySQL | P1 起使用 |
+| 3306 | MySQL | 业务数据 |
 | 6379 | Redis | refreshToken 等缓存 |
-| 9000 / 9001 | MinIO | P4 起使用 |
+| 9000 / 9001 | MinIO | 对象存储 / 控制台 |
 
-## 媒体链路（P3 起启用鉴权）
+## 媒体链路（P3 推流鉴权 / P4 播放令牌）
 
 ```text
 OBS 推流   rtmp://localhost:1935/live/{roomId}?key={streamKey}
@@ -171,6 +192,13 @@ WHEP 播放   http://localhost:8889/live/{roomId}/whep
 ```
 
 推流与播放都会回调后端 `/api/v1/media/auth` 校验权限，密钥不会出现在播放地址中。
+
+- 推流：`rtmp://localhost:1935/live/{roomId}?key={streamKey}`，OBS 服务器填 `rtmp://localhost:1935/live`，串流密钥填 `{roomId}?key={streamKey}`。
+- 开播：主播中心点「开始直播」生成密钥，OBS 推流成功后房间自动变为直播中；OBS 建议关键帧间隔 2 秒，WebRTC 首帧更快。
+- 播放：观众先取 `/rooms/{id}/play-info`，拿到带 `token` 的 WHEP/HLS 地址；WHEP 失败自动回退 HLS，播放令牌 5 分钟，刷新页面会重新签发。
+- 关播：主播中心点「结束直播」会踢掉推流；OBS 异常断开时由 MediaMTX 事件 + 10 秒对账兜底。
+- 回调 token 开发默认 `dev-media-callback-token`；生产需同时修改 `media/mediamtx.yml`、`media/notify.ps1` 和后端 `MEDIA_CALLBACK_TOKEN`。
+- MediaMTX 不会把 RTMP 的 AAC 音频转成 Opus，WebRTC 当前是视频轨；HLS 保留音频。
 
 > 首页的「媒体服务器」状态卡在开发环境经 Vite 的 `/media-api` 代理读取 MediaMTX 管理 API；该代理只存在于 `vite.config.ts`，生产部署不会暴露 9997。
 
@@ -181,8 +209,8 @@ WHEP 播放   http://localhost:8889/live/{roomId}/whep
 | P0 | 环境与工程骨架 | ✅ 已完成（2026-10-19） |
 | P1 | 数据模型与持久层 | ✅ 已完成（2026-10-19） |
 | P2 | 认证与用户 | ✅ 已完成（2026-10-19） |
-| P3 | 直播间与推流鉴权 | ⬜ 待开始 |
-| P4 | 播放页与观看体验 | ⬜ 待开始 |
+| P3 | 直播间与推流鉴权 | ✅ 已完成（2026-10-19） |
+| P4 | 播放页与观看体验 | ✅ 已完成（2026-10-19） |
 | P5 | 实时聊天与在线人数 | ⬜ 待开始 |
 | P6~P15 | L2 / L3 | ⬜ 待开始 |
 

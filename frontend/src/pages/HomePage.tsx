@@ -10,9 +10,12 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
-import { Button, Card, Col, Row, Space, Tag, Typography } from 'antd'
+import { Button, Card, Col, Empty, Row, Skeleton, Space, Tag, Typography } from 'antd'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { fetchRooms } from '@/api/room'
 import { fetchMediaStatus, fetchPing } from '@/api/system'
+import LiveRoomCard from '@/components/LiveRoomCard'
 import SiteHeader from '@/components/SiteHeader'
 
 const { Title, Paragraph, Text } = Typography
@@ -149,6 +152,13 @@ export default function HomePage() {
     retry: 1,
   })
 
+  const liveRooms = useQuery({
+    queryKey: ['rooms', 'live'],
+    queryFn: () => fetchRooms({ status: 1, size: 12 }),
+    refetchInterval: 15_000,
+    retry: 1,
+  })
+
   return (
     <div className="page">
       <SiteHeader />
@@ -156,7 +166,7 @@ export default function HomePage() {
       <section className="hero">
         <div className="hero-glow" />
         <Tag className="hero-badge" bordered={false} icon={<ThunderboltOutlined />}>
-          第一档进行中 · P0~P2 已完成
+          第一档进行中 · P0~P4 已完成
         </Tag>
         <Title level={1} className="hero-title">
           从推流到弹幕，
@@ -194,6 +204,46 @@ export default function HomePage() {
             <span>Docker 依赖</span>
           </div>
         </div>
+      </section>
+
+      <section id="live" className="section">
+        <div className="section-head">
+          <div>
+            <Title level={3}>正在直播</Title>
+            <Text type="secondary">进入房间即可观看，未登录也可以看</Text>
+          </div>
+          <Link to="/anchor">
+            <Button type="link">我要开播</Button>
+          </Link>
+        </div>
+        {liveRooms.isLoading ? (
+          <Row gutter={[16, 16]}>
+            {[0, 1, 2].map((item) => (
+              <Col xs={24} sm={12} lg={8} key={item}>
+                <Card variant="borderless" className="live-room-skeleton">
+                  <Skeleton active />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : liveRooms.isError ? (
+          <Empty description={liveRooms.error instanceof Error ? liveRooms.error.message : '直播列表加载失败'}>
+            <Button onClick={() => liveRooms.refetch()}>重试</Button>
+          </Empty>
+        ) : liveRooms.data && liveRooms.data.list.length > 0 ? (
+          <Row gutter={[16, 16]}>
+            {liveRooms.data.list.map((room) => (
+              <Col xs={24} sm={12} lg={8} key={room.id}>
+                <LiveRoomCard room={room} />
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="暂无正在直播的房间，去主播中心开一场吧"
+          />
+        )}
       </section>
 
       <section id="status" className="section">

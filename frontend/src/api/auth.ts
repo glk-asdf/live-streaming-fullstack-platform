@@ -26,3 +26,9 @@ export function fetchMe(): Promise<User> {
 export function updateMe(payload: UpdateProfilePayload): Promise<User> {
   return request.put('/users/me', payload)
 }
+
+export function uploadAvatar(file: File): Promise<User> {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/users/me/avatar', formData)
+}

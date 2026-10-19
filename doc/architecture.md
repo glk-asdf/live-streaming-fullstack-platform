@@ -101,7 +101,10 @@ rtmp://localhost:1935/live/{roomId}?key={streamKey}
 | WebRTC | WHEP（HTTP POST SDP） | 300~800ms | 默认，互动直播体验最好 |
 | LL-HLS | hls.js + fMP4 分片 | 1~3s | 兼容兜底、移动端弱网 |
 
-播放地址不直接暴露：观众先调 `GET /api/v1/rooms/{id}/play-info`，后端校验房间状态并签发 5 分钟播放令牌，播放器带 `?token=` 访问媒体服务器，MediaMTX 再回调后端校验 `read` 权限。
+播放地址不直接暴露：观众先调 `GET /api/v1/rooms/{id}/play-info`，后端校验房间状态并签发 5 分钟播放令牌，播放器带 `?token=` 访问媒体服务器，MediaMTX 再回调后端校验 `read` 权限。MediaMTX 会把 token 继续传播到 HLS 子播放列表、初始化和分片请求；WHEP 使用同一个 token。
+
+- WHEP 首帧依赖关键帧，OBS/编码器建议 2 秒关键帧间隔。
+- RTMP 的 AAC 音频不会被 MediaMTX 转为 Opus，WebRTC 当前仅含视频；HLS 保留音频。
 
 ### 4.3 关播与回放
 
@@ -179,10 +182,10 @@ layouts/      MainLayout（顶部导航）/ RoomLayout（播放器 + 侧栏）
 ### 6.3 媒体与部署
 
 ```text
-media/        mediamtx.yml / media-start.ps1 / media-stop.ps1 / bin（gitignore）
+media/        mediamtx.yml / media-start.ps1 / media-stop.ps1 / notify.ps1 / bin（gitignore）
 deploy/       nginx.conf / docker-compose.yml / smoke-test.ps1
 sql/          init.sql（按阶段增量追加）
-doc/          architecture.md / development-plan.md / development-log.md
+doc/          architecture.md / development-plan.md
 ```
 
 ---
@@ -272,11 +275,13 @@ t_user 1 ──< t_live_room >── 1 t_category
 |---|---|---|---|
 | 认证 | `POST /auth/register` `POST /auth/login` `POST /auth/refresh` `POST /auth/logout` | 注册登录刷新登出 | P2 |
 | 用户 | `GET /users/me` `PUT /users/me` | 当前用户资料 | P2 |
-| 房间 | `GET /rooms` | 分页 + 分类 + 关键词（状态过滤在 P3 随开播流转补齐） | P3 |
-| 房间 | `GET /rooms/{id}` | 详情（主播、关注态） | P3 |
+| 房间 | `GET /rooms` | 分页 + 分类 + 关键词 + 状态（默认 LIVE） | P4 |
+| 房间 | `GET /rooms/{id}` | 详情（主播信息 P4 补，关注态 P7 补） | P3 |
 | 房间 | `POST /rooms` `PUT /rooms/{id}` | 创建/编辑（主播） | P3 |
 | 房间 | `POST /rooms/{id}/start` `POST /rooms/{id}/stop` | 开播（轮换密钥）/ 关播 | P3 |
+| 房间 | `GET /rooms/mine` | 我的直播间（无房间时 data 为空） | P3 |
 | 房间 | `GET /rooms/{id}/stream` | 推流地址 + 密钥（仅主播） | P3 |
+| 房间 | `POST /rooms/{id}/stream-key/reset` | 重置推流密钥 | P3 |
 | 媒体 | `POST /media/auth` | MediaMTX 鉴权回调 | P3 |
 | 媒体 | `POST /media/online` `POST /media/offline` | 推流开始/结束事件（对应 MediaMTX `runOnOnline/runOnOffline`） | P3 |
 | 媒体 | `GET /rooms/{id}/play-info` | 播放地址 + 播放令牌 | P4 |
@@ -311,14 +316,15 @@ t_user 1 ──< t_live_room >── 1 t_category
 
 ```text
 OBS --publish(live/{roomId}?key={key})--> MediaMTX --POST /media/auth--> Backend
-                                                  ├─ 查 Redis 缓存 → 未命中查 MySQL
-                                                  ├─ 校验密钥、房间状态、用户封禁
+                                                  ├─ 查 MySQL（P3 直查；Redis 缓存留 P12）
+                                                  ├─ 校验密钥、房间状态、房主封禁
                                                   └─ 200 放行 / 401 拒绝
 ```
 
-- 密钥只在「开播」时轮换并返回一次，数据库存明文仅用于校验（学习项目可接受；生产建议存哈希）。
-- 关闭房间或封禁后立即删缓存，正在推的流由 MediaMTX API 主动踢下线。
-- 后端自身调用 MediaMTX 管理 API（对账、踢流）属于 `api` 动作，需在 `authHTTPExclude` 中排除 `api/metrics`，或只允许 `127.0.0.1`，避免鉴权回调自锁。
+- 密钥在「开播/重置」时轮换，仅房主可读取；数据库存明文仅用于校验（学习项目可接受；生产建议存哈希）。
+- 关闭房间立即置 `ENDED` 并调用 MediaMTX API 踢流；封禁时的缓存清理与强制下播在 P9 接入。
+- 后端自身调用 MediaMTX 管理 API（对账、踢流）属于 `api` 动作，需在 `authHTTPExclude` 中排除 `api/metrics/pprof`，或只允许 `127.0.0.1`，避免鉴权回调自锁。
+- 回调接口 `/media/auth|online|offline` 不携带 JWT，使用共享 token（查询参数）校验；本地开发允许回环地址兜底，生产必须显式配置 token。
 
 ### 9.2 在线人数
 
@@ -347,10 +353,10 @@ hot = 在线人数 × 3 + 近 10 分钟弹幕数 × 1 + 近 10 分钟礼物金�
 
 ### 9.6 状态对账
 
-- 每 30s 调 MediaMTX API 拉取活跃 path，与数据库中 `LIVE` 房间比对：
-  - 有流无 LIVE → 修正为 LIVE；
-  - LIVE 无流 → 置 ENDED 并触发回放登记。
-- 这是防「进程被杀导致房间永远直播中」的最后一道保险。
+- 每 10s 调 MediaMTX API 拉取活跃 path，与数据库中 `IDLE/LIVE` 房间比对：
+  - 有流但房间 IDLE → 修正为 LIVE；
+  - LIVE 无流且开播已超过 15s → 置 ENDED（宽限避免刚开播被误杀）。
+- 这是防「进程被杀导致房间永远直播中」的最后一道保险；回放登记在 P8 接入。
 
 ---
 
@@ -361,6 +367,8 @@ hot = 在线人数 × 3 + 近 10 分钟弹幕数 × 1 + 近 10 分钟礼物金�
 | 推流地址泄露 | 密钥随机 + 可重置 + 开播轮换 + 封禁即踢流 |
 | 播放地址盗链 | 5 分钟播放令牌 + 媒体服务器 read 鉴权 |
 | 越权操作房间 | 所有写操作校验 `anchor_id == 当前用户` |
+| 媒体事件伪造 | 共享 token + 回环地址校验；生产替换默认 token |
+| 头像上传 | 5MB 上限 + MIME 白名单 + 随机对象名；公开桶只读 |
 | XSS（弹幕） | 服务端转义 + 前端文本渲染 + CSP |
 | 刷弹幕/刷礼物 | Redis 限流 + 幂等键 + 异常行为封禁 |
 | 密钥入库 | `.env` 不入库；本地有开发默认值，生产必须用环境变量，Compose 缺失即启动失败（P15） |

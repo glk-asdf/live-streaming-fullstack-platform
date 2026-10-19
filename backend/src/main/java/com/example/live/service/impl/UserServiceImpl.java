@@ -11,14 +11,17 @@ import com.example.live.service.UserService;
 import com.example.live.vo.UserVO;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
+    private final MinioStorageService minioStorageService;
 
-    public UserServiceImpl(UserMapper userMapper) {
+    public UserServiceImpl(UserMapper userMapper, MinioStorageService minioStorageService) {
         this.userMapper = userMapper;
+        this.minioStorageService = minioStorageService;
     }
 
     @Override
@@ -46,6 +49,15 @@ public class UserServiceImpl implements UserService {
             user.setBio(StringUtils.hasText(bio) ? bio : null);
         }
 
+        userMapper.updateById(user);
+        return UserConverter.toVO(user);
+    }
+
+    @Override
+    public UserVO updateAvatar(MultipartFile file) {
+        User user = loadCurrentUser();
+        String avatarUrl = minioStorageService.uploadAvatar(file, user.getId());
+        user.setAvatar(avatarUrl);
         userMapper.updateById(user);
         return UserConverter.toVO(user);
     }

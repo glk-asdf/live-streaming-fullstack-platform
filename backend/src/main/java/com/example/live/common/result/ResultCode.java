@@ -16,6 +16,7 @@ public enum ResultCode {
     METHOD_NOT_ALLOWED(40500, 405, "请求方法不支持"),
     CONFLICT(40900, 409, "资源状态冲突"),
     UNSUPPORTED_MEDIA_TYPE(41500, 415, "请求内容类型不支持"),
+    PAYLOAD_TOO_LARGE(41300, 413, "上传文件过大"),
     TOO_MANY_REQUESTS(42900, 429, "操作过于频繁"),
     INTERNAL_ERROR(50000, 500, "服务器内部错误");
 

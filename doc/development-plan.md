@@ -30,8 +30,8 @@
 | P0 | 环境与工程骨架 | L1 | - | 0.5 天 | 前后端 + 媒体服务器各自可启动，链路探活通过 | ✅ 已完成（2026-10-19） |
 | P1 | 数据模型与持久层 | L1 | P0 | 1 天 | 建表完成，分页/逻辑删除/自动填充生效 | ✅ 已完成（2026-10-19） |
 | P2 | 认证与用户 | L1 | P1 | 1.5 天 | 注册登录刷新登出闭环 | ✅ 已完成（2026-10-19） |
-| P3 | 直播间与推流鉴权 | L1 | P2 | 2 天 | OBS 用密钥推流成功，未授权推流被拒 | ⬜ |
-| P4 | 播放页与观看体验 | L1 | P3 | 1.5 天 | 浏览器 WHEP/HLS 可播放，列表可进入 | ⬜ |
+| P3 | 直播间与推流鉴权 | L1 | P2 | 2 天 | OBS 用密钥推流成功，未授权推流被拒 | ✅ 已完成（2026-10-19） |
+| P4 | 播放页与观看体验 | L1 | P3 | 1.5 天 | 浏览器 WHEP/HLS 可播放，列表可进入 | ✅ 已完成（2026-10-19） |
 | P5 | 实时聊天与在线人数 | L1 | P4 | 1.5 天 | 弹幕实时互通，在线人数准确 | ⬜ |
 | P6 | 礼物与虚拟币账本 | L2 | P5 | 2 天 | 送礼扣款幂等，礼物广播与榜单可用 | ⬜ |
 | P7 | 热度榜 / 关注 / 搜索 | L2 | P6 | 1.5 天 | 首页按热度排序，关注流可用 | ⬜ |
@@ -324,7 +324,7 @@ cd frontend; npm run dev
 
 ---
 
-## P3 · 直播间与推流鉴权（2 天）
+## P3 · 直播间与推流鉴权（2 天）✅
 
 ### 目标
 
@@ -333,22 +333,22 @@ cd frontend; npm run dev
 ### 任务清单
 
 **数据与接口**
-- [ ] `t_live_room` 完整字段 + `t_category` 初始化数据
-- [ ] 任何登录用户创建房间时自动获得 `ANCHOR` 角色；同一主播只允许一个未结束房间（创建/开播时校验，冲突返回 409）
-- [ ] `POST/GET/PUT /api/v1/rooms`、`GET /rooms/{id}`
-- [ ] `POST /rooms/{id}/start`：轮换 streamKey、返回推流地址（状态保持未开播，publish 成功后才置 LIVE）
-- [ ] `POST /rooms/{id}/stream-key/reset`：主播重置密钥，旧密钥立即失效
-- [ ] `POST /rooms/{id}/stop`：状态置 ENDED、清理 Redis、通知媒体服务器踢流
-- [ ] `GET /rooms/{id}/stream`：仅主播本人可读
+- [x] `t_live_room` 完整字段 + `t_category` 初始化数据
+- [x] 任何登录用户创建房间时自动获得 `ANCHOR` 角色；同一主播只允许一个未结束房间（创建时校验，冲突返回 409）
+- [x] `POST/GET/PUT /api/v1/rooms`、`GET /rooms/{id}`、`GET /rooms/mine`
+- [x] `POST /rooms/{id}/start`：轮换 streamKey、返回推流地址（状态保持未开播，publish 成功后才置 LIVE）
+- [x] `POST /rooms/{id}/stream-key/reset`：主播重置密钥，旧密钥立即失效
+- [x] `POST /rooms/{id}/stop`：状态置 ENDED、通知媒体服务器踢流（在线人数 Redis 清理在 P5 接入）
+- [x] `GET /rooms/{id}/stream`：仅主播本人可读
 
 **媒体回调**
-- [ ] `POST /api/v1/media/auth`：解析 `action/path/query`，校验密钥与房间状态；publish 通过则置 LIVE
-- [ ] SecurityConfig 放行媒体回调路径（`/api/v1/media/auth`、`/api/v1/media/online|offline`）并校验回调来源/签名，避免伪造事件
-- [ ] `POST /api/v1/media/online` / `media/offline`：对应 MediaMTX `runOnOnline/runOnOffline`，事件落库与状态流转
-- [ ] MediaMTX 配置 `authMethod: http` + `runOnOnline/runOnOffline` 事件回调
-- [ ] `authHTTPExclude` 排除 `api`/`metrics`（或仅允许 127.0.0.1），避免后端调管理 API 时被自己的鉴权拦截
-- [ ] 定时对账任务（30s）：MediaMTX 活跃 path ↔ 数据库 LIVE 房间
-- [ ] 主播中心页：创建房间、封面、开播、复制推流地址、重置密钥
+- [x] `POST /api/v1/media/auth`：解析 `action/path/query`，校验密钥与房间状态；publish 通过则置 LIVE
+- [x] SecurityConfig 放行媒体回调路径并校验共享 token/回环来源，避免伪造事件
+- [x] `POST /api/v1/media/online` / `media/offline`：对应 MediaMTX `runOnOnline/runOnOffline`
+- [x] MediaMTX 配置 `authMethod: http` + 事件回调脚本 `media/notify.ps1`
+- [x] `authHTTPExclude` 排除 `api`/`metrics`/`pprof`
+- [x] 定时对账任务（10s，15s 启动宽限）：MediaMTX 活跃 path ↔ 数据库房间状态
+- [x] 主播中心页：创建房间、封面、开播、复制推流地址、重置密钥
 
 ### 交付物
 
@@ -371,9 +371,62 @@ cd frontend; npm run dev
 - OBS 推流与 ffmpeg 测试流并存时房间状态抖动 → 对账以最新事件为准。
 - `authMethod: http` 同样作用于管理 API → 未配置排除项时，对账/踢流请求会被 401，必须显式排除。
 
+### 完成记录（2026-10-19）✅
+
+**后端**
+
+| 项 | 结果 |
+|---|---|
+| 房间接口 | 创建/编辑/详情/我的房间/开播/关播/重置密钥/推流参数 |
+| 权限 | 仅房主可编辑、开播、查看密钥、关播；非房主 403；未登录 401 |
+| 唯一性 | 同一主播存在未结束房间时再次创建返回 409 |
+| 角色 | 创建房间时把 USER 提升为 ANCHOR（更新 token 中的 role 仍可能滞后，权限以 DB 房主为准） |
+| 推流密钥 | 24 字节随机 + Base64URL，开播轮换、可重置；直播中重置返回 409 |
+| 状态机 | `publish 鉴权 → LIVE`、`runOnOffline → ENDED`、`stop → ENDED 并踢流`、10s 对账兜底 |
+| 媒体回调 | `/media/auth`、`/media/online`、`/media/offline`，共享 token + 回环地址兜底 |
+| 对账 | 每 10s 拉 `/v3/paths/list`；LIVE 房间失联且开播超过 15s 才置 ENDED，避免刚开播误杀 |
+| 测试 | 13 个单元测试通过（新增 2 个 path/query 解析用例、3 个推流鉴权用例） |
+
+**前端**
+
+- 主播中心：空态创建、房间信息编辑、开始直播、OBS 服务器/密钥复制、重置密钥、结束直播。
+- 房间状态 5s 轮询；推流开始后页面自动从「未开播」切到「直播中」。
+- 开始/重置结果统一写 `room-stream` 缓存，避免重置后仍显示旧密钥。
+- 结束直播有二次确认；直播中禁用开始与重置。
+
+**真实验收（ffmpeg + MediaMTX）**
+
+- 错误密钥推流：MediaMTX 返回 `authentication failed`，房间保持未开播。
+- 正确密钥推流：房间 < 1s 变 LIVE，MediaMTX path `live/{roomId}` ready，HLS 返回 200。
+- 强杀推流进程：4s 内房间变 ENDED（`runOnOffline` 事件），HLS 变 401。
+- 主播中心点结束直播：后端踢掉 RTMP 连接，ffmpeg 退出，path 清空，状态 ENDED。
+- 直播中再次开播、重置密钥均返回 409；重置后旧密钥鉴权 401，新密钥 200。
+- 编辑直播间标题/分类/封面与公开详情接口返回正确。
+- 非房主结束直播/查看推流参数返回 403；同账号创建第二个未结束房间返回 409。
+- 错误回调 token 返回 401。
+- 浏览器：创建房间 → 开始直播 → ffmpeg 推流 → 页面自动变直播中 → 结束直播 → 状态与推流同步；重置密钥后页面展示新密钥；控制台 0 error。
+
+**说明**
+
+- 回调 token 为开发默认值，生产必须同时改 MediaMTX 配置、notify 脚本与后端环境变量。
+- 单账号唯一未结束房间目前是服务层校验，没有数据库唯一约束，并发创建存在极小概率竞态；P12 再做分布式锁。
+- `read` 鉴权目前只校验房间 LIVE；P4 播放令牌接入后收紧。
+- 公开列表仍返回所有未删除房间，P4 收紧为直播中优先。
+- 踢流是 best-effort：失败不影响关播，事件与对账会兜底。
+- 本机 ffmpeg 仅用于联调，放在 `D:\business\tools\ffmpeg`，不是项目运行依赖。
+- 测试房间与测试用户已清理。
+
+**实现中修复**
+
+- 主播中心开始/重置共用 `room-stream` 缓存，并在轮换后重新拉取，避免旧请求晚到覆盖新密钥。
+- 封禁房间禁止编辑、开播、重置与关播，避免房主用 stop 把状态从 BANNED 改回 ENDED。
+- 推流鉴权补房主用户状态校验，封禁用户即使持有旧 token 和密钥也不能推流；新增 3 个服务层用例覆盖合法/封禁房主/封禁房间。
+- 开播时重置在线人数、峰值与热度，避免上一场数据残留。
+- 媒体鉴权拒绝时记录 action/path 日志，便于排查推流失败（不记录密钥）。
+
 ---
 
-## P4 · 播放页与观看体验（1.5 天）
+## P4 · 播放页与观看体验（1.5 天）✅
 
 ### 目标
 
@@ -381,15 +434,16 @@ cd frontend; npm run dev
 
 ### 任务清单
 
-- [ ] `GET /rooms/{id}/play-info`：返回 `whepUrl/hlsUrl/token/expireAt`，房间非 LIVE 返回错误
-- [ ] SecurityConfig 放行 `GET /api/v1/rooms/*/play-info`（游客也能取播放令牌），其余主播接口继续要求登录
-- [ ] 播放令牌（JWT 5min，含 roomId + 游客/用户标识），MediaMTX `read` 鉴权校验
-- [ ] 前端 `Player` 组件：WHEP → 5s 超时/失败 → hls.js
-- [ ] 房间页布局：播放器 + 主播信息 + 关注按钮 + 弹幕侧栏占位
-- [ ] 首页列表：封面、标题、主播、在线人数、LIVE 角标；空态与骨架屏
-- [ ] 播放器状态：加载中 / 直播已结束 / 网络错误 + 重试
-- [ ] 头像上传 MinIO（P2 延后项），个人中心接入上传组件
-- [ ] 页面埋点：进入房间、播放成功、卡顿（为 L2 数据看板留字段）
+- [x] `GET /rooms/{id}/play-info`：返回 `whepUrl/hlsUrl/token/expireAt`，房间非 LIVE 返回 409
+- [x] `GET /rooms` 默认过滤 LIVE，并补主播昵称/头像；`GET /rooms/{id}` 同步补主播信息
+- [x] SecurityConfig 放行 `GET /api/v1/rooms/*/play-info`（游客也能取播放令牌），其余主播接口继续要求登录
+- [x] 播放令牌（JWT 5min，含 roomId + 游客/用户标识），MediaMTX `read` 鉴权校验
+- [x] 前端 `LivePlayer`：WHEP → 首帧超时/失败 → hls.js
+- [x] 房间页布局：播放器 + 主播信息 + 关注按钮 + 弹幕侧栏占位
+- [x] 首页列表：封面、标题、主播、在线人数、LIVE 角标；空态与骨架屏
+- [x] 播放器状态：加载中 / 直播已结束 / 网络错误 + 重试
+- [x] 头像上传 MinIO（P2 延后项），个人中心接入上传组件
+- [ ] 页面埋点：进入房间、播放成功、卡顿 → 延后到 P10 数据看板一起做
 
 ### 交付物
 
@@ -408,6 +462,55 @@ cd frontend; npm run dev
 - WebRTC 在 localhost 可用、局域网 IP 需 `webrtcAdditionalHosts` → 文档写清。
 - HLS 首次分片未生成导致 404 → 播放器重试 3 次，间隔 1s。
 - 移动端自动播放限制 → 默认静音 + 点击取消静音。
+
+### 完成记录（2026-10-19）✅
+
+**后端**
+
+| 项 | 结果 |
+|---|---|
+| play-info | 仅 LIVE 房间签发；返回 WHEP/HLS 地址与 5 分钟 token；非 LIVE 返回 409 |
+| 播放令牌 | JWT，`play=true + roomId`，游客 subject 为随机 guest，登录用户为 `user:{id}` |
+| read 鉴权 | MediaMTX read 回调解析 query token，校验房间状态与 roomId；无 token 401 |
+| 列表 | 默认 status=LIVE，按热度/创建时间排序，批量补主播昵称/头像 |
+| 详情 | 补主播昵称/头像 |
+| 头像 | MinIO 5MB/图片类型校验，随机对象名，公开桶；返回公开 URL |
+| 测试 | 17 个单元测试通过（新增 1 个播放令牌、3 个播放服务用例） |
+
+**前端**
+
+- 首页「正在直播」区：封面、LIVE 角标、主播、观看数、空态/骨架屏，15s 轮询。
+- 房间页：`/rooms/{id}`，播放器 + 主播卡 + 关注占位 + 弹幕占位 + 直播信息。
+- `LivePlayer`：WHEP 优先，首帧 5s 超时/失败后清空 WebRTC `srcObject` 再回退 HLS；HLS 失败可重试。
+- 房间状态 10s 轮询，下播后自动切结束态并卸载播放器。
+- 头像上传接入个人中心，上传后 Header 与资料同步。
+- 路由懒加载：播放器/hls.js 只在房间页加载，登录/注册/个人中心/主播中心拆包。
+
+**真实验收**
+
+- WHEP：Chrome 实际出画面 640×360，readyState=4，控制台 0 error。
+- HLS：阻断 WHEP 后自动回退，640×360、readyState=4；MediaMTX 会把 token 传播到子播放列表/分片。
+- 无 token HLS 401；无 token WHEP 401；有效 token WHEP 进入 SDP 协商（无效 SDP 400）。
+- 下播后 play-info 409，HLS 401，房间页自动显示已结束，首页直播列表为空。
+- 头像上传：接口 200、公开 URL 200、类型错误 415、超过 5MB 413；浏览器上传后资料即时更新。
+- 列表接口默认只返回 LIVE 房间，并带主播昵称/头像。
+
+**说明**
+
+- WebRTC 首帧依赖关键帧：OBS 建议关键帧间隔 2 秒；ffmpeg 联调使用 `-g 50`，否则最长要等 10s GOP。
+- MediaMTX 不会把 RTMP 的 AAC 转 Opus，当前 WebRTC 仅有视频轨；HLS 保留音频。
+- 播放令牌 5 分钟有效，过期后刷新页面会重新签发；没有做无感续期。
+- MinIO 使用开发默认账号，头像桶公开读；旧头像对象未自动删除。
+- 测试房间/用户资料已清理；MinIO 测试桶中可能保留少量测试头像对象。
+- 初始包仍约 880KB（AntD 共享块），房间页 hls.js 独立懒加载 584KB；进一步 vendor 拆分留 P13。
+- 页面埋点延后到 P10。
+
+**实现中修复**
+
+- WHEP 回退 HLS 时未清空 `video.srcObject`，导致 HLS 被旧 WebRTC 流抢占、黑屏 2×2；回退前显式清源。
+- WHEP “连上但未出画面”不会回退 → 增加首帧超时与 `hlsStarted` 取消保护，避免晚到的 WebRTC 事件覆盖 HLS。
+- 1.68MB 单包 → 路由懒加载，hls.js 只在房间页加载。
+- 房间下播后播放器无限停留 → 房间状态 10s 轮询，结束态自动卸载播放器。
 
 ---
 
@@ -814,8 +917,8 @@ npm run build
 | P0 | 2026-10-19 | 0.5 天 | 按计划完成 |
 | P1 | 2026-10-19 | 0.5 天 | 按计划完成 |
 | P2 | 2026-10-19 | 0.5 天 | 按计划完成；头像上传延后到 P4 |
-| P3 | | | |
-| P4 | | | |
+| P3 | 2026-10-19 | 0.5 天 | 真实 ffmpeg 推流、事件回调与踢流验证通过 |
+| P4 | 2026-10-19 | 0.5 天 | WHEP/HLS、播放令牌、头像上传与首页列表验证通过 |
 | P5 | | | |
 | P6 | | | |
 | P7 | | | |

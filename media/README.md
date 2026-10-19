@@ -22,6 +22,14 @@ powershell -ExecutionPolicy Bypass -File media\media-stop.ps1
 | 9997 | HTTP | 管理 API（仅 127.0.0.1） |
 | 8189 | UDP | WebRTC ICE |
 
+## 鉴权与事件（P3）
+
+- `authMethod: http`：推流/播放都回调后端 `/api/v1/media/auth`。
+- `authHTTPExclude` 排除 `api/metrics/pprof`，否则后端对账与踢流会被自己的鉴权拦截。
+- `runOnOnline` / `runOnOffline` 调用 `notify.ps1`，脚本读取 MediaMTX 注入的 `MTX_PATH` 并通知后端。
+- 回调共享 token 为开发默认值 `dev-media-callback-token`；生产必须同时修改 `media/mediamtx.yml`、`notify.ps1` 与后端环境变量 `MEDIA_CALLBACK_TOKEN`。
+- 事件失败不影响推流，后端每 10 秒对账一次。
+
 ## P0 手工验证（还没有后端鉴权）
 
 用 ffmpeg 推一个测试画面（需本机有 ffmpeg，没有可跳过）：

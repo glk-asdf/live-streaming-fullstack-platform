@@ -40,8 +40,10 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**",
-                                "/swagger-ui.html", "/error", "/favicon.ico").permitAll()
+                        .requestMatchers("/api/v1/auth/**", "/api/v1/media/**", "/v3/api-docs/**",
+                                "/swagger-ui/**", "/swagger-ui.html", "/error", "/favicon.ico").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms/mine").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/rooms/*/play-info").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/ping", "/api/v1/categories",
                                 "/api/v1/rooms", "/api/v1/rooms/*").permitAll()
                         .anyRequest().authenticated())
