@@ -1,0 +1,35 @@
+# MediaMTX 1.21 配置（P0 基础版）
+# 推流：rtmp://localhost:1935/live/{roomId}?key={streamKey}（P3 起启用鉴权）
+# 播放：LL-HLS http://localhost:8888/live/{roomId}/index.m3u8
+#       WHEP   http://localhost:8889/live/{roomId}/whep
+# 管理 API 只监听回环地址，不对外暴露。
+
+logLevel: info
+
+api: yes
+apiAddress: 127.0.0.1:9997
+
+rtsp: no
+rtmp: yes
+rtmpAddress: :1935
+
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentCount: 7
+hlsAllowOrigins: ["*"]
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAdditionalHosts: [127.0.0.1]
+webrtcAllowOrigins: ["*"]
+
+srt: no
+# 默认开启的 MoQ 会额外监听 8892/8893 并生成自签证书，首版不需要
+moq: no
+
+# P3 起改为按房间配置录制与事件回调
+paths:
+  all_others:

@@ -1,0 +1,47 @@
+import { useEffect } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
+import AuthGuard from '@/components/AuthGuard'
+import HomePage from '@/pages/HomePage'
+import LoginPage from '@/pages/LoginPage'
+import NotFoundPage from '@/pages/NotFoundPage'
+import ProfilePage from '@/pages/ProfilePage'
+import RegisterPage from '@/pages/RegisterPage'
+
+function ScrollToHash() {
+  const { hash, pathname } = useLocation()
+
+  useEffect(() => {
+    if (hash) {
+      const target = document.getElementById(hash.slice(1))
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+    }
+    window.scrollTo({ top: 0 })
+  }, [hash, pathname])
+
+  return null
+}
+
+export default function App() {
+  return (
+    <>
+      <ScrollToHash />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/profile"
+          element={
+            <AuthGuard>
+              <ProfilePage />
+            </AuthGuard>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </>
+  )
+}
