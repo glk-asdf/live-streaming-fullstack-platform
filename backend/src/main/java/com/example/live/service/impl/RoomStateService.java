@@ -3,6 +3,7 @@ package com.example.live.service.impl;
 import com.example.live.common.constant.RoomStatus;
 import com.example.live.entity.LiveRoom;
 import com.example.live.mapper.LiveRoomMapper;
+import com.example.live.ws.RoomEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,9 +20,11 @@ public class RoomStateService {
     private static final Logger log = LoggerFactory.getLogger(RoomStateService.class);
 
     private final LiveRoomMapper liveRoomMapper;
+    private final RoomEventPublisher roomEventPublisher;
 
-    public RoomStateService(LiveRoomMapper liveRoomMapper) {
+    public RoomStateService(LiveRoomMapper liveRoomMapper, RoomEventPublisher roomEventPublisher) {
         this.liveRoomMapper = liveRoomMapper;
+        this.roomEventPublisher = roomEventPublisher;
     }
 
     @Transactional
@@ -51,6 +54,7 @@ public class RoomStateService {
                 room.getPeakViewer() == null ? 0 : room.getPeakViewer(),
                 room.getViewerCount() == null ? 0 : room.getViewerCount()));
         liveRoomMapper.updateById(room);
+        roomEventPublisher.roomEnded(roomId);
         log.info("room {} -> ENDED", roomId);
     }
 }

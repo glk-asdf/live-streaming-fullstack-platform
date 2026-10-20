@@ -250,13 +250,12 @@ t_user 1 ──< t_live_room >── 1 t_category
 
 | Key | 类型 | 用途 | TTL |
 |---|---|---|---|
-| `live:playtoken:{jti}` | String | 播放令牌校验 | 5min |
-| `live:viewers:{roomId}` | ZSET | member=会话 ID，score=过期时间戳 | 心跳续期 |
-| `live:hot` | ZSET | 热度榜 | 常驻 |
-| `live:chat:recent:{roomId}` | List | 最近 100 条弹幕 | 2h |
-| `live:ratelimit:chat:{userId}` | String | 发弹幕限流 | 1s |
+| `live:viewers:{roomId}` | ZSET | member=WebSocket sessionId，score=最后心跳时间 | 2h |
+| `live:chat:{roomId}` | List | 最近 100 条弹幕 JSON | 6h |
+| `chat:rate:{userId}` | String | 发弹幕限流 | 1s |
 | `auth:refresh:{refreshToken}` | String | 值为 userId；刷新时 Lua 原子取出并删除 | 7d |
-| `live:stream:{streamKey}` | String | 密钥 → 房间 ID 缓存 | 10min |
+| `live:hot` | ZSET | 热度榜（P7） | 常驻 |
+| `live:stream:{streamKey}` | String | 密钥 → 房间 ID 缓存（P12） | 10min |
 
 ---
 
@@ -296,17 +295,18 @@ t_user 1 ──< t_live_room >── 1 t_category
 
 ### 8.3 WebSocket（STOMP）
 
-- 端点：`/ws`（原生 WebSocket，不用 SockJS）。
-- 认证：浏览器无法给 WebSocket 握手加自定义 HTTP 头，因此 token 放在 **STOMP CONNECT 帧的 `Authorization` native header**，服务端在 `ChannelInterceptor` 中校验；`/ws` 在 SecurityConfig 中放行，游客可连接但只能订阅。
-- 订阅：`/topic/rooms/{roomId}`。
-- 发送：`/app/rooms/{roomId}/chat`、`/app/rooms/{roomId}/like`、`/app/rooms/{roomId}/heartbeat`。
+- 端点：`/ws`（原生 WebSocket，不用 SockJS）；Vite 开发态代理 `/ws`，Nginx 部署需 `Upgrade`。
+- 认证：浏览器无法给 WebSocket 握手加自定义 HTTP 头，因此 token 放在 **STOMP CONNECT 帧的 `Authorization` native header**，`StompAuthChannelInterceptor` 校验并写入 Principal；`/ws` 在 SecurityConfig 放行。token 只在 CONNECT 时校验，长连接内不重复校验。
+- 订阅：`/topic/rooms/{roomId}`；游客可订阅。
+- 发送：`/app/rooms/{roomId}/chat` 仅登录用户；`/app/rooms/{roomId}/heartbeat` 游客也允许。
+- 错误：`@MessageExceptionHandler` 发到 `/user/queue/errors`。
 - 下行消息统一信封：
 
 ```json
-{ "type": "CHAT | GIFT | SYSTEM | VIEWER_COUNT | ROOM_END", "data": {}, "ts": 1790000000000 }
+{ "type": "CHAT | VIEWER_COUNT | ROOM_END | ERROR", "data": {}, "ts": 1790000000000 }
 ```
 
-- 限流：同一用户 1 秒 1 条弹幕、内容 ≤ 100 字；服务端统一转义，前端禁止 `dangerouslySetInnerHTML`。
+- 限流：同一用户 1 秒 1 条弹幕、内容 ≤ 100 字、简单敏感词；服务端文本返回，前端禁止 `dangerouslySetInnerHTML`。
 
 ---
 
@@ -328,9 +328,9 @@ OBS --publish(live/{roomId}?key={key})--> MediaMTX --POST /media/auth--> Backend
 
 ### 9.2 在线人数
 
-- WebSocket 连接成功即写入 `live:viewers:{roomId}`，score = 当前时间 + 30s。
-- 客户端每 15s 发心跳续期；定时任务每 10s 清理过期成员并广播人数。
-- 房间结束后删除集合并把峰值写入 `t_live_room.peak_viewer`。
+- 订阅房间时把 sessionId 写入 `live:viewers:{roomId}`，score = 最后心跳时间戳。
+- 客户端每 15s 发心跳续期；定时任务每 10s 清理超过 30s 未心跳的成员并广播人数。
+- 房间结束后删除集合并广播 0；峰值由房间状态服务写入 `t_live_room.peak_viewer`。
 
 ### 9.3 热度
 
@@ -348,8 +348,8 @@ hot = 在线人数 × 3 + 近 10 分钟弹幕数 × 1 + 近 10 分钟礼物金�
 
 ### 9.5 聊天风控
 
-- 限流（Redis）、长度与字符集校验、敏感词过滤（DFA 或简单词表）、同一内容刷屏检测。
-- 被禁言用户只能读不能发；封禁立即断开其 WebSocket 会话。
+- P5 已实现：Redis 1 秒限流、长度 ≤ 100、简单敏感词、status=1 禁言/status=2 封禁拦截；刷屏检测与 DFA 词库留 P13。
+- 被禁言用户只能读不能发；P5 对封禁用户的发送直接拒绝，管理端强制断开其 WebSocket 会话在 P9 接入。
 
 ### 9.6 状态对账
 
@@ -371,6 +371,7 @@ hot = 在线人数 × 3 + 近 10 分钟弹幕数 × 1 + 近 10 分钟礼物金�
 | 头像上传 | 5MB 上限 + MIME 白名单 + 随机对象名；公开桶只读 |
 | XSS（弹幕） | 服务端转义 + 前端文本渲染 + CSP |
 | 刷弹幕/刷礼物 | Redis 限流 + 幂等键 + 异常行为封禁 |
+| WebSocket 冒充/刷屏 | CONNECT 帧 JWT + 游客只读 + 1 秒限流 + 文本渲染 |
 | 密钥入库 | `.env` 不入库；本地有开发默认值，生产必须用环境变量，Compose 缺失即启动失败（P15） |
 | 管理接口 | `/admin/**` 强制 `ROLE_ADMIN`，操作留痕 |
 

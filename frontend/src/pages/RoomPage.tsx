@@ -1,10 +1,12 @@
-import { ArrowLeftOutlined, EyeOutlined, HeartOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, HeartOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import { Avatar, Button, Card, Empty, Skeleton, Space, Tag, Typography } from 'antd'
 import { Link, useParams } from 'react-router-dom'
 import { fetchPlayInfo, fetchRoom } from '@/api/room'
+import ChatPanel from '@/components/ChatPanel'
 import LivePlayer from '@/components/LivePlayer'
 import SiteHeader from '@/components/SiteHeader'
+import { useRoomChat } from '@/hooks/useRoomChat'
 import type { RoomStatus } from '@/types/room'
 
 const { Title, Paragraph, Text } = Typography
@@ -38,6 +40,8 @@ export default function RoomPage() {
     staleTime: 4 * 60_000,
     refetchOnWindowFocus: false,
   })
+  const chat = useRoomChat(roomId, validId && room?.status === 1)
+  const viewerCount = room?.status === 1 ? chat.viewerCount : (room?.viewerCount ?? 0)
 
   const status = room ? statusMeta[room.status] : null
 
@@ -125,7 +129,7 @@ export default function RoomPage() {
                       <Text type="secondary">
                         {room.anchorNickname ?? `主播 #${room.anchorId}`}
                         <span className="room-dot">·</span>
-                        {room.viewerCount} 人观看
+                        {viewerCount} 人观看
                       </Text>
                     </div>
                   </Space>
@@ -137,27 +141,17 @@ export default function RoomPage() {
             </div>
 
             <aside className="room-side">
-              <Card
-                variant="borderless"
-                className="room-side-card"
-                title="实时弹幕"
-                extra={<Text type="secondary">P5 接入</Text>}
-              >
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="弹幕与在线人数将在 P5 上线"
-                />
-                <div className="room-side-stats">
-                  <Space>
-                    <EyeOutlined />
-                    <Text type="secondary">{room.viewerCount} 人正在看</Text>
-                  </Space>
-                  <Space>
-                    <HeartOutlined />
-                    <Text type="secondary">{room.likeCount} 次点赞</Text>
-                  </Space>
-                </div>
-              </Card>
+              <ChatPanel
+                active={room.status === 1}
+                ended={chat.ended || room.status === 2}
+                blocked={room.status === 3}
+                connected={chat.connected}
+                messages={chat.messages}
+                viewerCount={chat.viewerCount}
+                error={chat.error}
+                onSend={chat.send}
+                onClearError={chat.clearError}
+              />
               <Card variant="borderless" className="room-side-card" title="直播信息">
                 <Paragraph className="room-side-line">
                   <Text type="secondary">开播时间</Text>

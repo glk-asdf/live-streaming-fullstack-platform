@@ -6,7 +6,7 @@
 
 | 档位 | 定位 | 状态 |
 |---|---|---|
-| L1 能推能看能聊 | 打通「推流 → 播放 → 弹幕」主链路 | 🚧 进行中（P0~P4 已完成） |
+| L1 能推能看能聊 | 打通「推流 → 播放 → 弹幕」主链路 | ✅ 已完成（P0~P5） |
 | L2 能互动能运营 | 礼物、榜单、回放、后台、数据看板 | ⬜ 未开始 |
 | L3 能上线能扩展 | 多码率、双实例、压测、可观测、一键部署 | ⬜ 未开始 |
 
@@ -132,7 +132,7 @@ cd ..\frontend; npm run build
 
 > 打包前先停止正在运行的后端：Windows 会锁定 `target` 下的 jar，导致 repackage 失败。
 
-## 当前接口（P4）
+## 当前接口（P5）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -142,6 +142,7 @@ cd ..\frontend; npm run build
 | GET | `/api/v1/rooms/mine` | 我的直播间（需登录；无房间时 data 为空） |
 | GET | `/api/v1/rooms/{id}` | 直播间详情（公开，含主播昵称/头像） |
 | GET | `/api/v1/rooms/{id}/play-info` | 播放地址 + 5 分钟播放令牌（公开，仅 LIVE） |
+| GET | `/api/v1/rooms/{id}/messages` | 最近 100 条弹幕历史（公开） |
 | POST | `/api/v1/rooms` | 创建直播间（需登录，单账号只能有一个未结束房间） |
 | PUT | `/api/v1/rooms/{id}` | 编辑直播间（仅房主） |
 | POST | `/api/v1/rooms/{id}/start` | 轮换推流密钥并返回 OBS 参数 |
@@ -202,6 +203,26 @@ WHEP 播放   http://localhost:8889/live/{roomId}/whep
 
 > 首页的「媒体服务器」状态卡在开发环境经 Vite 的 `/media-api` 代理读取 MediaMTX 管理 API；该代理只存在于 `vite.config.ts`，生产部署不会暴露 9997。
 
+## 实时弹幕与在线人数（P5）
+
+```text
+WebSocket  ws://localhost:5173/ws（Vite 代理到后端 8080）
+
+CONNECT 帧 Authorization: Bearer <accessToken>（游客可不带）
+SUBSCRIBE /topic/rooms/{roomId}
+SEND      /app/rooms/{roomId}/chat       {"content":"..."}
+SEND      /app/rooms/{roomId}/heartbeat  {}
+错误队列  /user/queue/errors
+```
+
+- 游客可连接、看弹幕，但不能 SEND 聊天；登录用户才能发言。
+- STOMP 只在 CONNECT 帧校验 token；长连接存续期间不重复校验，accessToken 过期后需重连/刷新。
+- 消息 1~100 字、简单敏感词过滤、同一用户 1 秒最多 1 条。
+- 最近 100 条存 Redis `live:chat:{roomId}`，同时落 `t_chat_message`；缓存丢失时从 DB 回退。
+- 在线人数按 WebSocket 连接数统计，Redis `live:viewers:{roomId}` ZSET；15 秒心跳、30 秒过期、10 秒清理。
+- 主播关播或媒体离线时，向 `/topic/rooms/{id}` 广播 `ROOM_END`，前端禁用输入。
+- 在线人数是「连接数」口径，多标签页会重复计数；单实例 session 映射，P12 再做多实例。
+
 ## 开发进度
 
 | 阶段 | 内容 | 状态 |
@@ -211,7 +232,7 @@ WHEP 播放   http://localhost:8889/live/{roomId}/whep
 | P2 | 认证与用户 | ✅ 已完成（2026-10-19） |
 | P3 | 直播间与推流鉴权 | ✅ 已完成（2026-10-19） |
 | P4 | 播放页与观看体验 | ✅ 已完成（2026-10-19） |
-| P5 | 实时聊天与在线人数 | ⬜ 待开始 |
+| P5 | 实时聊天与在线人数 | ✅ 已完成（2026-10-20） |
 | P6~P15 | L2 / L3 | ⬜ 待开始 |
 
 任务拆解、验收标准与风险见 [`doc/development-plan.md`](doc/development-plan.md)。

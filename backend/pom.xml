@@ -94,6 +94,12 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- WebSocket / STOMP：房间弹幕与在线人数 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- 对象存储：头像（P4） -->
         <dependency>
             <groupId>io.minio</groupId>

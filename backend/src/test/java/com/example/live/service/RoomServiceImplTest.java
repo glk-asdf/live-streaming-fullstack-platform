@@ -9,6 +9,7 @@ import com.example.live.mapper.UserMapper;
 import com.example.live.service.impl.MediaApiClient;
 import com.example.live.service.impl.RoomServiceImpl;
 import com.example.live.service.impl.RoomStateService;
+import com.example.live.ws.RoomEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +33,8 @@ class RoomServiceImplTest {
     private RoomStateService roomStateService;
     @Mock
     private MediaApiClient mediaApiClient;
+    @Mock
+    private RoomEventPublisher roomEventPublisher;
 
     private RoomServiceImpl roomService;
 
@@ -41,7 +44,7 @@ class RoomServiceImplTest {
                 "localhost", 1935, "http://localhost:8888", "http://localhost:8889",
                 "http://127.0.0.1:9997", "test-callback-token");
         roomService = new RoomServiceImpl(
-                liveRoomMapper, userMapper, roomStateService, mediaApiClient, properties);
+                liveRoomMapper, userMapper, roomStateService, mediaApiClient, properties, roomEventPublisher);
     }
 
     @Test

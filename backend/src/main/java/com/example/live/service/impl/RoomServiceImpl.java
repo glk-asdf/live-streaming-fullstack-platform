@@ -18,6 +18,7 @@ import com.example.live.mapper.UserMapper;
 import com.example.live.service.RoomService;
 import com.example.live.vo.LiveRoomVO;
 import com.example.live.vo.RoomStreamVO;
+import com.example.live.ws.RoomEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -44,15 +45,17 @@ public class RoomServiceImpl implements RoomService {
     private final RoomStateService roomStateService;
     private final MediaApiClient mediaApiClient;
     private final MediaProperties mediaProperties;
+    private final RoomEventPublisher roomEventPublisher;
 
     public RoomServiceImpl(LiveRoomMapper liveRoomMapper, UserMapper userMapper,
                            RoomStateService roomStateService, MediaApiClient mediaApiClient,
-                           MediaProperties mediaProperties) {
+                           MediaProperties mediaProperties, RoomEventPublisher roomEventPublisher) {
         this.liveRoomMapper = liveRoomMapper;
         this.userMapper = userMapper;
         this.roomStateService = roomStateService;
         this.mediaApiClient = mediaApiClient;
         this.mediaProperties = mediaProperties;
+        this.roomEventPublisher = roomEventPublisher;
     }
 
     @Override
@@ -183,6 +186,7 @@ public class RoomServiceImpl implements RoomService {
                 room.getPeakViewer() == null ? 0 : room.getPeakViewer(),
                 room.getViewerCount() == null ? 0 : room.getViewerCount()));
         liveRoomMapper.updateById(room);
+        roomEventPublisher.roomEnded(id);
 
         try {
             mediaApiClient.kickPublisher(MediaPathUtil.roomPath(id));

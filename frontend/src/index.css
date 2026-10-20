@@ -576,6 +576,82 @@ a {
   margin-bottom: 10px !important;
 }
 
+.chat-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.chat-alert {
+  margin-bottom: 10px;
+}
+
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+.chat-list .ant-empty {
+  margin: auto 0;
+}
+
+.chat-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.chat-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-name {
+  color: #b9a8ff !important;
+  font-size: 11px;
+}
+
+.chat-content {
+  color: rgba(232, 232, 240, 0.86) !important;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.chat-system {
+  padding: 4px 0;
+  color: rgba(232, 232, 240, 0.45);
+  font-size: 12px;
+  text-align: center;
+}
+
+.chat-submit {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chat-submit .ant-input {
+  flex: 1;
+}
+
+.chat-login-hint {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.chat-login-hint a {
+  margin-left: 4px;
+  color: #b9a8ff;
+}
+
 .player-shell {
   position: relative;
   width: 100%;
